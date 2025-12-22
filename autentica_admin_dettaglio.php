@@ -16,7 +16,7 @@ function env(string $key, $default = null) {
     $value = getenv($key);
     return $value !== false ? $value : $default;
 }
-$API_BASE = env('API_BASE', 'http://127.0.0.1:8077');
+$API_BASE = env('API_BASE', 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net');
 
 
 function backend_get($url) {
@@ -148,3 +148,4 @@ body { background:#f4f6f9; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
