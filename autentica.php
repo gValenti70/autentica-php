@@ -298,13 +298,48 @@ $dettaglio_richiesto = $risposta_api["dettaglio_richiesto"] ?? null;
 $percentuale = $risposta_api["percentuale"] ?? null;
 $motivazione = $risposta_api["motivazione"] ?? null;
 
-
 function stile_card($perc) {
-    if ($perc === null) return ["bg"=>"#f8f9fa","border"=>"#6c757d","label"=>"⚪ Non disponibile"];
-    if ($perc <= 35) return ["bg"=>"#e8f7ee","border"=>"#28a745","label"=>"🟢 Bassa contraffazione"];
-    if ($perc <= 66) return ["bg"=>"#fff8e1","border"=>"#ffc107","label"=>"🟡 Rischio moderato"];
-    return ["bg"=>"#fdecea","border"=>"#dc3545","label"=>"🔴 Alta contraffazione"];
+
+    // Caso speciale: analisi impossibile
+    if ($perc === 100 || $perc === "100") {
+        return [
+            "bg"     => "#fdecea",
+            "border" => "#dc3545",
+            "label"  => "❌ ANALISI IMPOSSIBILE"
+        ];
+    }
+
+    if ($perc === null) {
+        return [
+            "bg"=>"#f8f9fa",
+            "border"=>"#6c757d",
+            "label"=>"⚪ Non disponibile"
+        ];
+    }
+
+    if ($perc <= 35) {
+        return [
+            "bg"=>"#e8f7ee",
+            "border"=>"#28a745",
+            "label"=>"🟢 Bassa contraffazione"
+        ];
+    }
+
+    if ($perc <= 66) {
+        return [
+            "bg"=>"#fff8e1",
+            "border"=>"#ffc107",
+            "label"=>"🟡 Rischio moderato"
+        ];
+    }
+
+    return [
+        "bg"=>"#fdecea",
+        "border"=>"#dc3545",
+        "label"=>"🔴 Alta contraffazione"
+    ];
 }
+
 $perc = $percentuale;
 $style = stile_card($perc);
 
@@ -754,5 +789,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
