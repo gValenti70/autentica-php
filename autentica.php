@@ -481,13 +481,22 @@ body { background: var(--adm-bg); color: var(--adm-text); margin: 0; }
         <form id="fotoForm" method="POST" enctype="multipart/form-data" class="mb-2">
             <label class="form-label"><strong>Carica foto <?= (int)$step ?></strong></label>
             <input 
-                type="file" 
-                class="form-control mb-3" 
-                name="foto" required 
-                accept="image/*" 
+                type="file"
+                id="fotoInput"
+                class="d-none"
+                name="foto"
+                required
+                accept="image/*"
                 capture="environment"
                 onchange="previewImage(event)"
             >
+            
+            <button 
+                type="button"
+                id="fotoButton"
+                class="btn btn-adm-secondary w-100 mb-3">
+                📁 Sfoglia file
+            </button>
 
             <div id="preview-box" class="text-center mb-3" style="display:none;">
                 <img id="preview-img" src="#" alt="Anteprima foto">
@@ -724,6 +733,26 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    const btn = document.getElementById("fotoButton");
+    const input = document.getElementById("fotoInput");
+
+    if (!btn || !input) return;
+
+    if (isMobile) {
+        btn.innerText = "📸 Scatta foto";
+    }
+
+    btn.addEventListener("click", () => {
+        input.click();
+    });
+});
+</script>
+
 </body>
 </html>
+
 
