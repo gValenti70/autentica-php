@@ -161,52 +161,72 @@ if (isset($_GET['riprendi'])) {
  * INVIO FOTO
  * =========================
  */
-// Se il file è caricato, convertilo in base64 e invialo al backend
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['foto']) && !empty($_FILES['foto']['tmp_name'])) {
 
-    // Prima di inviare, usa la funzione per convertirlo in base64
-    $foto_b64 = file_to_base64($_FILES['foto']['tmp_name']);  // Base64 del file
+    $foto_b64 = file_to_base64($_FILES['foto']['tmp_name']);
 
-    // Prepara il payload per il backend
+    // payload: backend si aspetta base64 "pura"
     $payload = [
         "user_id"    => $user_id,
         "foto"       => $foto_b64,
         "id_analisi" => $id_analisi,
     ];
 
-    // Invia la foto al backend tramite la tua funzione cURL
     $code = null;
     $json = curl_json_post("$API_BASE/analizza-oggetto", $payload, $code);
 
-    // Gestisci l'errore o la risposta del backend
     if (!is_array($json)) {
         $errore_api = "<pre>Errore API (POST /analizza-oggetto) HTTP $code\n</pre>";
     } else {
-        // Successo: salva la risposta e aggiorna la sessione
+
+        // salva id_analisi se è la prima volta
         if (!$_SESSION['id_analisi'] && isset($json["id_analisi"])) {
             $_SESSION['id_analisi'] = $json["id_analisi"];
         }
 
         $_SESSION['last_api'] = $json;
 
-        // Mostra l'immagine caricata
-        $_SESSION['immagini'][] = $foto_b64;
-
-        // Logica per passare al prossimo step o completare l'analisi
+        // step: se richiede altra foto -> prossimo step, altrimenti completato
         $need_more = $json["richiedi_altra_foto"] ?? true;
         $tot_foto  = $json["tot_foto"] ?? null;
 
+        // immagini: NON fidarti della sessione, meglio ricaricare dallo stato analisi
+        $new_id = $_SESSION['id_analisi'];
+
+        // ✅ MOSTRA SUBITO LA FOTO APPENA CARICATA
+        $_SESSION['immagini'][] = $foto_b64;
+
+        // 🔁 Poi prova ad allinearti al backend (se già aggiornato)
+        if ($new_id) {
+            $code2 = null;
+            $state = curl_json_get("$API_BASE/stato-analisi/$new_id", $code2);
+
+            if (is_array($state)) {
+                $imgs = $state["immagini_base64"] ?? [];
+                if (is_array($imgs) && count($imgs) >= count($_SESSION['immagini'])) {
+                    $_SESSION['immagini'] = $imgs;
+                }
+            }
+        }
+
+
+
+
         if ($need_more === false || $need_more === "false" || $need_more === 0 || $need_more === "0") {
-            $_SESSION['step'] = 99;  // Completato
+            $_SESSION['step'] = 99;
         } else {
-            $_SESSION['step'] = max(1, (int)$tot_foto + 1);  // Prossimo step
+            // prossimo step = tot_foto + 1 se disponibile, altrimenti ++
+            if ($tot_foto !== null) {
+                $_SESSION['step'] = max(1, (int)$tot_foto + 1);
+            } else {
+                $_SESSION['step'] = (int)($_SESSION['step'] ?? 1) + 1;
+            }
         }
 
         header("Location: " . $home);
         exit;
     }
 }
-
 
 /**
  * ======================================================
@@ -631,87 +651,5 @@ if (form) {
 }
 </script>
 
-
-<script>
-  document.getElementById("upload").addEventListener("change", function(event) {
-    const file = event.target.files[0];
-    if (file) {
-      compressImage(file);
-    }
-  });
-
-  function compressImage(file) {
-    // Imposta le dimensioni massime
-    const maxWidth = 1024;  // Cambia questi valori in base alle tue esigenze
-    const maxHeight = 1024;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const img = new Image();
-      img.src = e.target.result;
-
-      img.onload = function() {
-        let width = img.width;
-        let height = img.height;
-
-        // Ridimensiona l'immagine mantenendo le proporzioni
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round(height * (maxWidth / width));
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round(width * (maxHeight / height));
-            height = maxHeight;
-          }
-        }
-
-        // Crea un canvas e disegna l'immagine ridimensionata
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Converte l'immagine compressa in Base64 (jpeg con qualità al 70%)
-        canvas.toBlob(function(blob) {
-          const reader = new FileReader();
-          reader.onloadend = function() {
-            const base64String = reader.result.split(",")[1];  // Rimuove il prefisso "data:image/jpeg;base64,"
-            console.log("Base64 String:", base64String);
-            
-            // Ora puoi inviare il base64 al backend
-            uploadImage(base64String);
-          };
-          reader.readAsDataURL(blob);
-        }, "image/jpeg", 0.7);  // 0.7 è la qualità della compressione (70%)
-      };
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function uploadImage(base64String) {
-    // Esegui una richiesta al tuo backend per inviare l'immagine in Base64
-    const formData = new FormData();
-    formData.append("image", base64String);
-
-    fetch("https://tuo-backend.azurewebsites.net/upload", {
-      method: "POST",
-      body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-      console.log("Image uploaded successfully:", data);
-    })
-    .catch(error => {
-      console.error("Error uploading image:", error);
-    });
-  }
-</script>
-
-
 </body>
 </html>
-
-
