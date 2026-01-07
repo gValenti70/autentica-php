@@ -15,7 +15,7 @@ session_start();
  */
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: autentica_login.php?pag=" . urlencode("autentica_vademecum_admin.php"));
+    header("Location: autentica_login.php?pag=" . urlencode("autentica_vademecum.php"));
     exit;
 }
 
@@ -508,4 +508,5 @@ textarea{ min-height: 260px; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
