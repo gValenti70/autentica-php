@@ -18,12 +18,12 @@ function env(string $key, $default = null) {
     return $value !== false ? $value : $default;
 }
 $API_BASE = env('API_BASE', 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net');
-
+// $API_BASE = "http://127.0.0.1:8077"; // ✅ cambia con Azure quando serve
 /* ===========================
    UTILS
 =========================== */
 function clean($v) {
-    return htmlspecialchars(trim($v), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars(trim((string)$v), ENT_QUOTES, 'UTF-8');
 }
 
 function backend_get($url) {
@@ -46,72 +46,107 @@ function backend_post($url, $payload) {
 $message = "";
 
 /* ===========================
+   VIEW MODE
+=========================== */
+$view = $_GET['view'] ?? 'mine'; // mine | community
+if (!in_array($view, ['mine', 'community'], true)) $view = 'mine';
+
+/* ===========================
+   SELECTED PROMPT
+=========================== */
+$prompt_name = $_GET['prompt'] ?? null;
+$owner_id = $_GET['owner'] ?? $user_id; // in community arriva owner
+$owner_id = $owner_id ?: $user_id;
+
+$is_owner = ($owner_id === $user_id);
+
+/* ===========================
    POST ACTIONS
+   (Consentite SOLO se owner = user corrente)
 =========================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    switch ($_POST['action'] ?? '') {
+    // hard-stop lato frontend (comunque il backend deve validare!)
+    if (!$is_owner) {
+        $message = "Operazione non consentita: puoi modificare solo i tuoi prompt.";
+    } else {
 
-        case 'new_version':
-            backend_post("$API_BASE/prompt/save", [
-                "user_id" => $user_id,
-                "prompt_name" => $_POST['prompt_name'],
-                "content" => $_POST['content'],
-                "comment" => $_POST['comment'] ?? "",
-                "feedback" => $_POST['feedback'] ?? ""
-            ]);
-            $message = "Nuova versione creata e attivata.";
-            break;
+        switch ($_POST['action'] ?? '') {
 
-        case 'activate_version':
-            backend_post("$API_BASE/prompt/activate", [
-                "user_id" => $user_id,
-                "prompt_name" => $_POST['prompt_name'],
-                "version" => intval($_POST['version'])
-            ]);
-            $message = "Versione attivata.";
-            break;
+            case 'new_version':
+                backend_post("$API_BASE/prompt/save", [
+                    "user_id" => $user_id,
+                    "prompt_name" => $_POST['prompt_name'],
+                    "content" => $_POST['content'],
+                    "comment" => $_POST['comment'] ?? "",
+                    "feedback" => $_POST['feedback'] ?? ""
+                ]);
+                $message = "Nuova versione creata e attivata.";
+                break;
 
-        case 'update_feedback':
-            backend_post("$API_BASE/prompt/feedback", [
-                "user_id" => $user_id,
-                "id" => $_POST['id'],
-                "feedback" => $_POST['feedback']
-            ]);
-            $message = "Feedback aggiornato.";
-            break;
+            case 'activate_version':
+                backend_post("$API_BASE/prompt/activate", [
+                    "user_id" => $user_id,
+                    "prompt_name" => $_POST['prompt_name'],
+                    "version" => intval($_POST['version'])
+                ]);
+                $message = "Versione attivata.";
+                break;
 
-        case 'delete_version':
-            backend_post("$API_BASE/prompt/delete", [
-                "user_id" => $user_id,
-                "id" => $_POST['id']
-            ]);
-            $message = "Versione eliminata.";
-            break;
+            case 'update_feedback':
+                backend_post("$API_BASE/prompt/feedback", [
+                    "user_id" => $user_id,
+                    "id" => $_POST['id'],
+                    "feedback" => $_POST['feedback']
+                ]);
+                $message = "Feedback aggiornato.";
+                break;
+
+            case 'delete_version':
+                backend_post("$API_BASE/prompt/delete", [
+                    "user_id" => $user_id,
+                    "id" => $_POST['id']
+                ]);
+                $message = "Versione eliminata.";
+                break;
+        }
     }
 }
 
 /* ===========================
-   DATA FETCH
+   DATA FETCH - LISTA
 =========================== */
 
+$prompts = [];
+$community_prompts = [];
+
+// Lista "mine" come prima
 $prompts = backend_get(
     "$API_BASE/prompt/list?user_id=" . urlencode($user_id)
 ) ?? [];
 
+// Lista community: prompt attivi degli altri
+// Richiede endpoint: GET /prompt/list_active?exclude_user_id=...
+if ($view === 'community') {
+    $community_prompts = backend_get(
+        "$API_BASE/prompt/list_active?exclude_user_id=" . urlencode($user_id)
+    ) ?? [];
+}
 
-$prompt_name = $_GET['prompt'] ?? null;
+/* ===========================
+   DATA FETCH - DETTAGLIO
+=========================== */
 $active_version = null;
 $versions = [];
 
 if ($prompt_name) {
     $active = backend_get(
-        "$API_BASE/prompt/get/" . urlencode($prompt_name) . "?user_id=" . urlencode($user_id)
+        "$API_BASE/prompt/get/" . urlencode($prompt_name) . "?user_id=" . urlencode($owner_id)
     );
     $active_version = $active['version'] ?? null;
 
     $versions = backend_get(
-        "$API_BASE/prompt/history/" . urlencode($prompt_name) . "?user_id=" . urlencode($user_id)
+        "$API_BASE/prompt/history/" . urlencode($prompt_name) . "?user_id=" . urlencode($owner_id)
     ) ?? [];
 }
 ?>
@@ -178,6 +213,14 @@ if ($prompt_name) {
             color: var(--adm-blue);
         }
         .btn-adm-secondary { background:#e6ecf7;border-color:#003b80;color:#003b80;font-weight:600; }
+
+        .pill {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid #d0d7e2;
+        }
     </style>
 </head>
 
@@ -196,20 +239,62 @@ if ($prompt_name) {
         <div class="alert alert-success shadow-sm"><?= $message ?></div>
     <?php endif; ?>
 
+    <!-- TABS VIEW -->
+    <div class="mb-3 d-flex gap-2">
+        <a class="btn <?= ($view === 'mine') ? 'btn-adm-primary' : 'btn-outline-primary' ?>"
+           href="?view=mine<?= $prompt_name ? '&prompt='.urlencode($prompt_name) : '' ?>">
+            🧑‍💻 I miei prompt
+        </a>
+
+        <a class="btn <?= ($view === 'community') ? 'btn-adm-primary' : 'btn-outline-primary' ?>"
+           href="?view=community">
+            🌍 Community (attivi)
+        </a>
+
+        <?php if ($view === 'community'): ?>
+            <span class="pill align-self-center">Read-only: puoi solo copiare</span>
+        <?php endif; ?>
+    </div>
+
     <div class="row">
 
         <!-- LISTA PROMPT -->
         <div class="col-md-3">
             <div class="list-group shadow-sm">
-                <div class="list-group-item active fw-bold">Prompt disponibili</div>
+                <div class="list-group-item active fw-bold">
+                    <?= ($view === 'community') ? 'Prompt attivi degli altri' : 'Prompt disponibili' ?>
+                </div>
 
-                <?php foreach ($prompts as $p): ?>
-                <a href="?prompt=<?= urlencode($p['prompt_name']) ?>"
-                   class="list-group-item list-group-item-action
-                   <?= ($prompt_name === $p['prompt_name']) ? 'active' : '' ?>">
-                    <?= $p['prompt_name'] ?>
-                </a>
-                <?php endforeach; ?>
+                <?php if ($view === 'mine'): ?>
+
+                    <?php foreach ($prompts as $p): ?>
+                    <a href="?view=mine&prompt=<?= urlencode($p['prompt_name']) ?>"
+                       class="list-group-item list-group-item-action
+                       <?= ($prompt_name === $p['prompt_name'] && $owner_id === $user_id) ? 'active' : '' ?>">
+                        <?= $p['prompt_name'] ?>
+                    </a>
+                    <?php endforeach; ?>
+
+                <?php else: ?>
+
+                    <?php foreach ($community_prompts as $p): ?>
+                    <a href="?view=community&prompt=<?= urlencode($p['prompt_name']) ?>&owner=<?= urlencode($p['user_id']) ?>"
+                       class="list-group-item list-group-item-action
+                       <?= ($prompt_name === $p['prompt_name'] && $owner_id === $p['user_id']) ? 'active' : '' ?>">
+                        <div class="d-flex justify-content-between">
+                            <span><?= clean($p['prompt_name']) ?></span>
+                            <small class="text-muted"><?= clean($p['user_id']) ?></small>
+                        </div>
+                    </a>
+                    <?php endforeach; ?>
+
+                    <?php if (empty($community_prompts)): ?>
+                        <div class="list-group-item text-muted small">
+                            Nessun prompt community disponibile (o endpoint mancante).
+                        </div>
+                    <?php endif; ?>
+
+                <?php endif; ?>
             </div>
         </div>
 
@@ -219,8 +304,35 @@ if ($prompt_name) {
 <?php if ($prompt_name): ?>
             <div class="card adm-card shadow-sm">
 
-                <div class="card-header bg-white">
-                    <h4 class="m-0 text-primary">✏️ Prompt: <strong><?= $prompt_name ?></strong></h4>
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 class="m-0 text-primary">
+                            ✏️ Prompt: <strong><?= clean($prompt_name) ?></strong>
+                        </h4>
+                        <?php if (!$is_owner): ?>
+                            <small class="text-muted">Owner: <?= clean($owner_id) ?> • modalità sola copia</small>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- copia rapido del prompt attivo (prima versione in history/active) -->
+                    <?php
+                        $active_text = "";
+                        if (!empty($versions)) {
+                            foreach ($versions as $vv) {
+                                if (($vv['version'] ?? null) == $active_version) {
+                                    $active_text = (string)($vv['content'] ?? "");
+                                    break;
+                                }
+                            }
+                            if ($active_text === "" && isset($versions[0]['content'])) $active_text = (string)$versions[0]['content'];
+                        }
+                    ?>
+                    <?php if ($active_text !== ""): ?>
+                        <button class="btn btn-sm btn-outline-primary"
+                                data-copy="<?= htmlspecialchars($active_text, ENT_QUOTES, 'UTF-8') ?>">
+                            📋 Copia attivo
+                        </button>
+                    <?php endif; ?>
                 </div>
 
                 <div class="card-body">
@@ -231,8 +343,8 @@ if ($prompt_name) {
                     <div class="border rounded p-3 mb-3 bg-light">
 
                         <div class="d-flex justify-content-between">
-                            <strong>Versione v<?= $v['version'] ?></strong>
-                            <span class="text-muted"><?= $v['created_at'] ?></span>
+                            <strong>Versione v<?= clean($v['version']) ?></strong>
+                            <span class="text-muted"><?= clean($v['created_at'] ?? '') ?></span>
                         </div>
 
                         <?php if (!empty($v['comment'])): ?>
@@ -245,47 +357,63 @@ if ($prompt_name) {
 
                         <details class="mt-2">
                             <summary>Mostra Prompt</summary>
-                            <pre class="prompt-preview mt-2"><?= htmlentities($v['content']) ?></pre>
+                            <pre class="prompt-preview mt-2"><?= htmlentities($v['content'] ?? "") ?></pre>
                         </details>
 
-                        <?php if ($v['version'] != $active_version): ?>
-                        <form method="POST" class="mt-2 d-flex gap-2">
-                            <input type="hidden" name="action" value="activate_version">
-                            <input type="hidden" name="prompt_name" value="<?= $prompt_name ?>">
-                            <input type="hidden" name="version" value="<?= $v['version'] ?>">
-                            <button class="btn btn-sm btn-adm-primary">Attiva versione</button>
-                        </form>
-
-                        <form method="POST" class="mt-2">
-                            <input type="hidden" name="action" value="delete_version">
-                            <input type="hidden" name="id" value="<?= $v['id'] ?>">
-                            <button class="btn btn-sm btn-outline-danger"
-                                    onclick="return confirm('Eliminare questa versione?');">
-                                🗑️ Elimina versione
+                        <div class="mt-2 d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    data-copy="<?= htmlspecialchars((string)($v['content'] ?? ""), ENT_QUOTES, 'UTF-8') ?>">
+                                📋 Copia
                             </button>
-                        </form>
-                        <?php else: ?>
-                            <span class="badge bg-success mt-2">Attiva</span>
-                        <?php endif; ?>
 
+                            <?php if ($is_owner): ?>
+                                <?php if (($v['version'] ?? null) != $active_version): ?>
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="action" value="activate_version">
+                                    <input type="hidden" name="prompt_name" value="<?= clean($prompt_name) ?>">
+                                    <input type="hidden" name="version" value="<?= intval($v['version']) ?>">
+                                    <button class="btn btn-sm btn-adm-primary">Attiva versione</button>
+                                </form>
+
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="action" value="delete_version">
+                                    <input type="hidden" name="id" value="<?= clean($v['id']) ?>">
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            onclick="return confirm('Eliminare questa versione?');">
+                                        🗑️ Elimina versione
+                                    </button>
+                                </form>
+                                <?php else: ?>
+                                    <span class="badge bg-success">Attiva</span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <?php if (($v['version'] ?? null) == $active_version): ?>
+                                    <span class="badge bg-success">Attiva (owner)</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($is_owner): ?>
                         <form method="POST" class="mt-3">
                             <input type="hidden" name="action" value="update_feedback">
-                            <input type="hidden" name="id" value="<?= $v['id'] ?>">
+                            <input type="hidden" name="id" value="<?= clean($v['id']) ?>">
                             <label class="form-label">Modifica Feedback</label>
                             <textarea name="feedback" class="form-control" rows="2"><?= clean($v['feedback'] ?? "") ?></textarea>
                             <button class="btn btn-adm-primary btn-sm mt-2">Salva feedback</button>
                         </form>
+                        <?php endif; ?>
 
                     </div>
 <?php endforeach; ?>
 
+                    <?php if ($is_owner): ?>
                     <hr>
 
                     <h5 class="text-primary">➕ Crea nuova versione</h5>
 
                     <form method="POST">
                         <input type="hidden" name="action" value="new_version">
-                        <input type="hidden" name="prompt_name" value="<?= $prompt_name ?>">
+                        <input type="hidden" name="prompt_name" value="<?= clean($prompt_name) ?>">
 
                         <label class="form-label">Commento (facoltativo)</label>
                         <input type="text" name="comment" class="form-control mb-3">
@@ -298,6 +426,7 @@ if ($prompt_name) {
 
                         <button class="btn btn-adm-primary">Salva nuova versione</button>
                     </form>
+                    <?php endif; ?>
 
                 </div>
             </div>
@@ -306,6 +435,31 @@ if ($prompt_name) {
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-copy]");
+  if (!btn) return;
+
+  const text = btn.getAttribute("data-copy") || "";
+  const original = btn.innerText;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.innerText = "Copiato ✓";
+    setTimeout(() => btn.innerText = original, 900);
+  } catch (err) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    btn.innerText = "Copiato ✓";
+    setTimeout(() => btn.innerText = original, 900);
+  }
+});
+</script>
+
 </body>
 </html>
-
