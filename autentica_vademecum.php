@@ -19,7 +19,12 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$API_BASE = 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net';
+function env(string $key, $default = null) {
+    $value = getenv($key);
+    return $value !== false ? $value : $default;
+}
+$API_BASE = env('API_BASE', 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net');
+
 
 // $API_BASE = "https://xxxx.azurewebsites.net";
 
@@ -508,6 +513,7 @@ textarea{ min-height: 260px; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
 
