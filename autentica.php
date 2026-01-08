@@ -62,42 +62,90 @@ function curl_json_get($url, &$http_code = null) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 15,
-        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_CONNECTTIMEOUT => 10,
     ]);
+
     $response = curl_exec($ch);
+    $errno = curl_errno($ch);
+    $err  = curl_error($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($response === false || $response === null || $response === "") {
-        return null;
+        return [
+            "error" => true,
+            "message" => "GET fallita o risposta vuota",
+            "http_code" => $http_code,
+            "curl_errno" => $errno,
+            "curl_error" => $err
+        ];
     }
 
     $json = json_decode($response, true);
-    return is_array($json) ? $json : null;
+
+    if (!is_array($json)) {
+        return [
+            "error" => true,
+            "message" => "GET: JSON non valido",
+            "http_code" => $http_code,
+            "body_preview" => mb_substr($response, 0, 500)
+        ];
+    }
+
+    return $json;
 }
 
 function curl_json_post($url, array $payload, &$http_code = null) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 60,
-        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 120,           // <-- alza, GPT può sforare
+        CURLOPT_CONNECTTIMEOUT => 15,
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ["Content-Type: application/json"],
         CURLOPT_POSTFIELDS => json_encode($payload),
     ]);
+
+    $t0 = microtime(true);
     $response = curl_exec($ch);
+    $ms = round((microtime(true) - $t0) * 1000);
+
+    $errno = curl_errno($ch);
+    $err  = curl_error($ch);
     $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
     if ($response === false || $response === null || $response === "") {
-        return null;
+        return [
+            "error" => true,
+            "message" => "POST fallita o risposta vuota",
+            "http_code" => $http_code,
+            "curl_errno" => $errno,
+            "curl_error" => $err,
+            "elapsed_ms" => $ms
+        ];
     }
 
     $json = json_decode($response, true);
-    return is_array($json) ? $json : null;
+
+    if (!is_array($json)) {
+        return [
+            "error" => true,
+            "message" => "POST: JSON non valido",
+            "http_code" => $http_code,
+            "elapsed_ms" => $ms,
+            "body_preview" => mb_substr($response, 0, 1000)
+        ];
+    }
+
+    // (facoltativo) aggiungi sempre elapsed_ms per debug UI
+    $json["_frontend_http_code"] = $http_code;
+    $json["_frontend_elapsed_ms"] = $ms;
+
+    return $json;
 }
+
 
 function file_to_base64($tmp_path) {
     return base64_encode(file_get_contents($tmp_path));
@@ -791,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
