@@ -62,8 +62,8 @@ function curl_json_get($url, &$http_code = null) {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_CONNECTTIMEOUT => 60,
     ]);
 
     $response = curl_exec($ch);
@@ -101,7 +101,7 @@ function curl_json_post($url, array $payload, &$http_code = null) {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 120,           // <-- alza, GPT può sforare
-        CURLOPT_CONNECTTIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 60,
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ["Content-Type: application/json"],
         CURLOPT_POSTFIELDS => json_encode($payload),
@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
