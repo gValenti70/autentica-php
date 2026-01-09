@@ -482,7 +482,7 @@ body { background: var(--adm-bg); color: var(--adm-text); margin: 0; }
         </div>
         <div class="adm-header-right">
             <div class="d-flex" style="gap:0.35rem;">
-                <a href="autentica_admin.php" class="btn btn-sm btn-adm-secondary">📊 Admin</a>
+                <a href="autentica_admin.php" class="btn btn-sm btn-adm-secondary">📊 Dashboard</a>
                 <a href="autentica_prompt.php" class="btn btn-sm btn-adm-secondary">✏️ Prompt</a>
                 <a href="autentica_vademecum.php" class="btn btn-sm btn-adm-secondary">{...} Vademecum</a>
 
@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
