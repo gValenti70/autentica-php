@@ -244,18 +244,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['foto']) && !empty($_
         // ✅ MOSTRA SUBITO LA FOTO APPENA CARICATA
         $_SESSION['immagini'][] = $foto_b64;
 
-        // 🔁 Poi prova ad allinearti al backend (se già aggiornato)
-        if ($new_id) {
-            $code2 = null;
-            $state = curl_json_get("$API_BASE/stato-analisi/$new_id", $code2);
+        // // 🔁 Poi prova ad allinearti al backend (se già aggiornato)
+        // if ($new_id) {
+        //     $code2 = null;
+        //     $state = curl_json_get("$API_BASE/stato-analisi/$new_id", $code2);
 
-            if (is_array($state)) {
-                $imgs = $state["immagini_base64"] ?? [];
-                if (is_array($imgs) && count($imgs) >= count($_SESSION['immagini'])) {
-                    $_SESSION['immagini'] = $imgs;
-                }
-            }
-        }
+        //     if (is_array($state)) {
+        //         $imgs = $state["immagini_base64"] ?? [];
+        //         if (is_array($imgs) && count($imgs) >= count($_SESSION['immagini'])) {
+        //             $_SESSION['immagini'] = $imgs;
+        //         }
+        //     }
+        // }
 
 
 
@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
