@@ -226,6 +226,7 @@ body {
     <th>Stato</th>
     <th>Marca</th>
     <th>Modello</th>
+    <th>Tipologia</th>
     <th>Foto</th>
     <th>Step</th>
     <th>%</th>
@@ -256,7 +257,7 @@ body {
 
     <td><?= htmlentities($r['marca_stimata']) ?></td>
     <td><?= htmlentities($r['modello_stimato']) ?></td>
-
+    <td><?= htmlentities($r['tipologia']) ?></td>
     <td class="text-center">
         <span class="badge bg-info text-dark"><?= intval($r['totale_foto']) ?> foto</span>
     </td>
@@ -296,4 +297,5 @@ body {
 </div>
 </body>
 </html>
+
 
