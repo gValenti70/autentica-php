@@ -61,7 +61,7 @@ function stile_card($perc) {
         ];
     }
 
-    if ($perc <= 35) {
+    if ($perc <= 25) {
         return [
             "bg"=>"#e8f7ee",
             "border"=>"#28a745",
@@ -183,5 +183,6 @@ body { background:#f4f6f9; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
