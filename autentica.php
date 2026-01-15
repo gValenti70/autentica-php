@@ -365,7 +365,7 @@ function stile_card($perc) {
         ];
     }
 
-    if ($perc <= 35) {
+    if ($perc <= 25) {
         return [
             "bg"=>"#e8f7ee",
             "border"=>"#28a745",
@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
