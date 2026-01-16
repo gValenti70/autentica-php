@@ -268,7 +268,7 @@ body {
         <?php
         $p = $r['percentuale_contraffazione'];
         if (is_numeric($p)) {
-            if ($p < 25) echo "<span class='badge bg-success badge-lg'>{$p}%</span>";
+            if ($p < 35) echo "<span class='badge bg-success badge-lg'>{$p}%</span>";
             elseif ($p < 66) echo "<span class='badge bg-warning text-dark badge-lg'>{$p}%</span>";
             else echo "<span class='badge bg-danger badge-lg'>{$p}%</span>";
         } else {
@@ -297,6 +297,7 @@ body {
 </div>
 </body>
 </html>
+
 
 
 
