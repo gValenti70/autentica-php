@@ -369,7 +369,7 @@ function stile_card($perc) {
         return [
             "bg"=>"#e8f7ee",
             "border"=>"#28a745",
-            "label"=>"🟢 Bassa contraffazione"
+            "label"=>"🟢 Probabilità di contraffazione bassa"
         ];
     }
 
@@ -384,7 +384,7 @@ function stile_card($perc) {
     return [
         "bg"=>"#fdecea",
         "border"=>"#dc3545",
-        "label"=>"🔴 Alta contraffazione"
+        "label"=>"🔴 Probabilità di contraffazione alta"
     ];
 }
 
@@ -839,6 +839,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
