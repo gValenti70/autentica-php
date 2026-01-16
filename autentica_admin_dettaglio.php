@@ -65,7 +65,7 @@ function stile_card($perc) {
         return [
             "bg"=>"#e8f7ee",
             "border"=>"#28a745",
-            "label"=>"🟢 Bassa contraffazione"
+            "label"=>"🟢 Probabilità di contraffazione bassa"
         ];
     }
 
@@ -80,7 +80,7 @@ function stile_card($perc) {
     return [
         "bg"=>"#fdecea",
         "border"=>"#dc3545",
-        "label"=>"🔴 Alta contraffazione"
+        "label"=>"🔴 Probabilità di contraffazione alta"
     ];
 }
 
@@ -183,6 +183,7 @@ body { background:#f4f6f9; }
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
 
