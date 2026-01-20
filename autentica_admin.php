@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -11,14 +12,16 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
+// ===============================
+// ENV / API
+// ===============================
 function env(string $key, $default = null) {
     $value = getenv($key);
     return $value !== false ? $value : $default;
 }
 $API_BASE = env('API_BASE', 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net');
 
-
-function backend_get($url) {
+function backend_get(string $url): array {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -32,20 +35,54 @@ function backend_get($url) {
 }
 
 // ===============================
-// FILTRI
+// INPUT: FILTRI + PAGINAZIONE
 // ===============================
 $search = $_GET['search'] ?? "";
 $stato  = $_GET['stato'] ?? "";
 
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) $page = 1;
+
+$page_size = isset($_GET['page_size']) ? (int)$_GET['page_size'] : 25;
+$allowedSizes = [10, 25, 50, 100];
+if (!in_array($page_size, $allowedSizes, true)) $page_size = 25;
+
 // ===============================
-// QUERY BACKEND
+// CALL BACKEND
 // ===============================
 $query = http_build_query(array_filter([
-    "search" => $search,
-    "stato"  => $stato
+    "search"    => $search,
+    "stato"     => $stato,
+    "page"      => $page,
+    "page_size" => $page_size
 ]));
 
-$rows = backend_get("$API_BASE/admin/analisi?$query");
+$resp = backend_get("$API_BASE/admin/analisi?$query");
+
+// Supporto backend nuovo (object con items/meta) + fallback backend vecchio (array puro)
+if (isset($resp[0]) && is_array($resp)) {
+    $rows = $resp;
+    $total = count($rows);
+    $total_pages = 1;
+} else {
+    $rows        = $resp['items'] ?? [];
+    $total       = (int)($resp['total'] ?? 0);
+    $page        = (int)($resp['page'] ?? $page);
+    $page_size   = (int)($resp['page_size'] ?? $page_size);
+    $total_pages = (int)($resp['total_pages'] ?? 1);
+    if ($total_pages < 1) $total_pages = 1;
+    if ($page < 1) $page = 1;
+    if ($page > $total_pages) $page = $total_pages;
+}
+
+// ===============================
+// HELPERS URL (mantieni filtri)
+// ===============================
+function build_url(array $override = []): string {
+    $qs = array_merge($_GET, $override);
+    return '?' . http_build_query($qs);
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -154,10 +191,19 @@ body {
     border-color: #002e63;
     color: white;
 }
-.btn-adm-secondary { background:#e6ecf7;border-color:#003b80;color:#003b80;font-weight:600; }
 
+.btn-adm-secondary {
+    background: #e6ecf7;
+    border-color: #003b80;
+    color: #003b80;
+    font-weight: 600;
+}
+
+.pager-meta {
+    font-size: .9rem;
+    color: #6b7480;
+}
 </style>
-
 </head>
 
 <body>
@@ -205,12 +251,23 @@ body {
     </div>
 
     <div class="col-md-2">
+        <select name="page_size" class="form-control">
+            <?php foreach ([10,25,50,100] as $s): ?>
+                <option value="<?= $s ?>" <?= ($page_size==$s) ? "selected" : "" ?>><?= $s ?>/pag</option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+
+    <div class="col-md-1">
         <button class="btn btn-adm-primary w-100">Filtra</button>
     </div>
 
     <div class="col-md-2">
         <a href="autentica_admin.php" class="btn btn-secondary w-100">Reset</a>
     </div>
+
+    <!-- quando filtri, riparti da pagina 1 -->
+    <input type="hidden" name="page" value="1">
 </form>
 </div>
 
@@ -238,49 +295,52 @@ body {
 
 <?php if (!$rows): ?>
 <tr>
-    <td colspan="10" class="text-center text-muted">Nessuna analisi trovata</td>
+    <td colspan="11" class="text-center text-muted">Nessuna analisi trovata</td>
 </tr>
 <?php endif; ?>
 
 <?php foreach ($rows as $r): ?>
 <tr>
-    <td><?= htmlentities($r['id']) ?></td>
-    <td><?= htmlentities($r['user_id']) ?></td>
+    <td><?= htmlentities($r['id'] ?? "") ?></td>
+    <td><?= htmlentities($r['user_id'] ?? "") ?></td>
 
     <td>
-        <?php if ($r['stato'] === 'completata'): ?>
+        <?php if (($r['stato'] ?? "") === 'completata'): ?>
             <span class="badge bg-success">Completata</span>
         <?php else: ?>
             <span class="badge bg-warning text-dark">In corso</span>
         <?php endif; ?>
     </td>
 
-    <td><?= htmlentities($r['marca_stimata']) ?></td>
-    <td><?= htmlentities($r['modello_stimato']) ?></td>
-    <td><?= htmlentities($r['tipologia']) ?></td>
+    <td><?= htmlentities($r['marca_stimata'] ?? "") ?></td>
+    <td><?= htmlentities($r['modello_stimato'] ?? "") ?></td>
+    <td><?= htmlentities($r['tipologia'] ?? "") ?></td>
+
     <td class="text-center">
-        <span class="badge bg-info text-dark"><?= intval($r['totale_foto']) ?> foto</span>
+        <span class="badge bg-info text-dark"><?= intval($r['totale_foto'] ?? 0) ?> foto</span>
     </td>
 
-    <td class="text-center"><strong><?= intval($r['last_step']) ?></strong></td>
+    <td class="text-center"><strong><?= intval($r['last_step'] ?? 1) ?></strong></td>
 
     <td class="text-center">
         <?php
-        $p = $r['percentuale_contraffazione'];
+        $p = $r['percentuale_contraffazione'] ?? null;
         if (is_numeric($p)) {
-            if ($p < 35) echo "<span class='badge bg-success badge-lg'>{$p}%</span>";
-            elseif ($p < 66) echo "<span class='badge bg-warning text-dark badge-lg'>{$p}%</span>";
-            else echo "<span class='badge bg-danger badge-lg'>{$p}%</span>";
+            $p = (float)$p;
+            $p_txt = rtrim(rtrim(number_format($p, 1, '.', ''), '0'), '.'); // 12.0 -> 12
+            if ($p < 35) echo "<span class='badge bg-success badge-lg'>{$p_txt}%</span>";
+            elseif ($p < 66) echo "<span class='badge bg-warning text-dark badge-lg'>{$p_txt}%</span>";
+            else echo "<span class='badge bg-danger badge-lg'>{$p_txt}%</span>";
         } else {
             echo "<span class='badge bg-secondary'>N.D.</span>";
         }
         ?>
     </td>
 
-    <td><?= htmlentities($r['created_at']) ?></td>
+    <td><?= htmlentities($r['created_at'] ?? "") ?></td>
 
     <td class="text-center">
-        <a href="autentica_admin_dettaglio.php?id=<?= urlencode($r['id']) ?>"
+        <a href="autentica_admin_dettaglio.php?id=<?= urlencode($r['id'] ?? "") ?>"
            class="btn btn-sm btn-adm-primary">
             Apri
         </a>
@@ -291,13 +351,88 @@ body {
 </tbody>
 </table>
 
+<?php
+// ===============================
+// PAGINAZIONE UI (Bootstrap)
+// ===============================
+if ($total_pages < 1) $total_pages = 1;
+
+$window = 2;
+$start = max(1, $page - $window);
+$end   = min($total_pages, $page + $window);
+
+// Per mostrare sempre anche prima/ultima con ellissi
+$showEllipsisLeft  = ($start > 2);
+$showEllipsisRight = ($end < $total_pages - 1);
+?>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="pager-meta">
+        Totale: <strong><?= intval($total) ?></strong>
+        — Pagina <strong><?= intval($page) ?></strong> / <strong><?= intval($total_pages) ?></strong>
+    </div>
+
+    <?php if ($total_pages > 1): ?>
+    <nav aria-label="Paginazione analisi">
+        <ul class="pagination mb-0">
+
+            <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $page <= 1 ? '#' : build_url(['page' => 1]) ?>">«</a>
+            </li>
+
+            <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $page <= 1 ? '#' : build_url(['page' => $page - 1]) ?>">‹</a>
+            </li>
+
+            <!-- Prima pagina -->
+            <?php if ($start > 1): ?>
+                <li class="page-item <?= 1 == $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= build_url(['page' => 1]) ?>">1</a>
+                </li>
+            <?php endif; ?>
+
+            <?php if ($showEllipsisLeft): ?>
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+            <?php endif; ?>
+
+            <!-- Finestra centrale -->
+            <?php for ($p = $start; $p <= $end; $p++): ?>
+                <?php if ($p == 1 || $p == $total_pages) continue; ?>
+                <li class="page-item <?= $p == $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= build_url(['page' => $p]) ?>"><?= $p ?></a>
+                </li>
+            <?php endfor; ?>
+
+            <?php if ($showEllipsisRight): ?>
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+            <?php endif; ?>
+
+            <!-- Ultima pagina -->
+            <?php if ($total_pages > 1 && $end < $total_pages): ?>
+                <li class="page-item <?= $total_pages == $page ? 'active' : '' ?>">
+                    <a class="page-link" href="<?= build_url(['page' => $total_pages]) ?>"><?= $total_pages ?></a>
+                </li>
+            <?php endif; ?>
+
+            <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $page >= $total_pages ? '#' : build_url(['page' => $page + 1]) ?>">›</a>
+            </li>
+
+            <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $page >= $total_pages ? '#' : build_url(['page' => $total_pages]) ?>">»</a>
+            </li>
+
+        </ul>
+    </nav>
+    <?php endif; ?>
+</div>
+
 </div>
 </div>
 
 </div>
 </body>
 </html>
-
 
 
 
