@@ -1,4 +1,3 @@
-
 <?php
 ob_start();
 session_start();
@@ -50,31 +49,48 @@ $allowedSizes = [10, 25, 50, 100];
 if (!in_array($page_size, $allowedSizes, true)) $page_size = 25;
 
 // ===============================
-// CALL BACKEND
+// CHIAMA BACKEND SOLO SE HO AZIONE UTENTE
+// - click su Filtra (do_filter)
+// - oppure click paginazione (page > 1)
+// - oppure ci sono filtri valorizzati (search/stato/page_size esplicito)
 // ===============================
-$query = http_build_query(array_filter([
-    "search"    => $search,
-    "stato"     => $stato,
-    "page"      => $page,
-    "page_size" => $page_size
-]));
+$has_filters = (trim($search) !== "") || (trim($stato) !== "");
+$clicked_filter = isset($_GET['do_filter']); // <— arriva dal bottone
+$should_fetch = $clicked_filter || ($page > 1) || $has_filters;
 
-$resp = backend_get("$API_BASE/admin/analisi?$query");
+// ===============================
+// CALL BACKEND (solo se serve)
+// ===============================
+if ($should_fetch) {
+    $query = http_build_query(array_filter([
+        "search"    => $search,
+        "stato"     => $stato,
+        "page"      => $page,
+        "page_size" => $page_size
+    ]));
 
-// Supporto backend nuovo (object con items/meta) + fallback backend vecchio (array puro)
-if (isset($resp[0]) && is_array($resp)) {
-    $rows = $resp;
-    $total = count($rows);
-    $total_pages = 1;
+    $resp = backend_get("$API_BASE/admin/analisi?$query");
+
+    // Supporto backend nuovo (object con items/meta) + fallback backend vecchio (array puro)
+    if (isset($resp[0]) && is_array($resp)) {
+        $rows = $resp;
+        $total = count($rows);
+        $total_pages = 1;
+    } else {
+        $rows        = $resp['items'] ?? [];
+        $total       = (int)($resp['total'] ?? 0);
+        $page        = (int)($resp['page'] ?? $page);
+        $page_size   = (int)($resp['page_size'] ?? $page_size);
+        $total_pages = (int)($resp['total_pages'] ?? 1);
+        if ($total_pages < 1) $total_pages = 1;
+        if ($page < 1) $page = 1;
+        if ($page > $total_pages) $page = $total_pages;
+    }
 } else {
-    $rows        = $resp['items'] ?? [];
-    $total       = (int)($resp['total'] ?? 0);
-    $page        = (int)($resp['page'] ?? $page);
-    $page_size   = (int)($resp['page_size'] ?? $page_size);
-    $total_pages = (int)($resp['total_pages'] ?? 1);
-    if ($total_pages < 1) $total_pages = 1;
-    if ($page < 1) $page = 1;
-    if ($page > $total_pages) $page = $total_pages;
+    // Apertura pagina "pulita": nessuna chiamata al backend
+    $rows = [];
+    $total = 0;
+    $total_pages = 1;
 }
 
 // ===============================
@@ -261,7 +277,8 @@ body {
     </div>
 
     <div class="col-md-1">
-        <button class="btn btn-adm-primary w-100">Filtra</button>
+        <!-- MODIFICA MINIMA: aggiungo name="do_filter" -->
+        <button class="btn btn-adm-primary w-100" name="do_filter" value="1">Filtra</button>
     </div>
 
     <div class="col-md-2">
@@ -435,10 +452,3 @@ $showEllipsisRight = ($end < $total_pages - 1);
 </div>
 </body>
 </html>
-
-
-
-
-
-
-
