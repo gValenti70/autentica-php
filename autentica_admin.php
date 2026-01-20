@@ -1,10 +1,6 @@
 
 <?php
 session_start();
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-error_reporting(E_ALL);
-
 // ===============================
 // AUTH
 // ===============================
@@ -23,7 +19,6 @@ function env(string $key, $default = null) {
     return $value !== false ? $value : $default;
 }
 $API_BASE = env('API_BASE', 'https://autentica-dqcbd5brdthhbeb2.swedencentral-01.azurewebsites.net');
-
 
 
 function backend_get(string $url): array {
@@ -438,6 +433,7 @@ $showEllipsisRight = ($end < $total_pages - 1);
 </div>
 </body>
 </html>
+
 
 
 
