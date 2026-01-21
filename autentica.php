@@ -736,13 +736,6 @@ function previewImage(evt) {
     reader.readAsDataURL(file);
 }
 
-const form = document.getElementById("fotoForm");
-if (form) {
-    form.addEventListener("submit", function () {
-        const spinner = document.getElementById("loading-spinner");
-        if (spinner) spinner.style.display = "block";
-    });
-}
 </script>
 
 <script>
@@ -750,66 +743,107 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("fotoForm");
     if (!form) return;
 
-    form.addEventListener("submit", async function (e) {
-        const fileInput = form.querySelector('input[type="file"]');
-        if (!fileInput || !fileInput.files.length) return;
+    const spinner = document.getElementById("loading-spinner");
+    const submitBtn = form.querySelector('button.btn-adm-primary');
+    const fileInput = document.getElementById("fotoInput");
 
-        e.preventDefault(); // fermiamo submit originale
+    // sicurezza: se torni sulla pagina dopo redirect/cache, niente clessidra
+    window.addEventListener("pageshow", () => {
+        if (spinner) spinner.style.display = "none";
+        if (submitBtn) submitBtn.disabled = false;
+    });
+
+    form.addEventListener("submit", function (e) {
+        if (!fileInput || !fileInput.files || !fileInput.files.length) return;
+
+        e.preventDefault(); // gestiamo noi il submit
+
+        if (spinner) spinner.style.display = "block";
+        if (submitBtn) submitBtn.disabled = true;
 
         const originalFile = fileInput.files[0];
+
+        // Se non supporta canvas/toBlob (raro ma succede), submit diretto
+        if (!window.FileReader || !document.createElement("canvas").toBlob) {
+            form.submit();
+            return;
+        }
 
         const img = new Image();
         const reader = new FileReader();
 
+        const fail = (msg) => {
+            console.warn(msg);
+            if (spinner) spinner.style.display = "none";
+            if (submitBtn) submitBtn.disabled = false;
+            alert("Problema nella preparazione della foto. Riprova oppure invia la foto senza comprimere.");
+        };
+
+        reader.onerror = () => fail("FileReader error");
+        img.onerror = () => fail("Image decode error");
+
         reader.onload = () => {
             img.onload = () => {
-                const MAX_SIZE = 1280;
-                let { width, height } = img;
+                try {
+                    const MAX_SIZE = 1280;
+                    let width = img.width;
+                    let height = img.height;
 
-                if (width > height && width > MAX_SIZE) {
-                    height *= MAX_SIZE / width;
-                    width = MAX_SIZE;
-                } else if (height > MAX_SIZE) {
-                    width *= MAX_SIZE / height;
-                    height = MAX_SIZE;
+                    if (width > height && width > MAX_SIZE) {
+                        height = Math.round(height * (MAX_SIZE / width));
+                        width = MAX_SIZE;
+                    } else if (height > MAX_SIZE) {
+                        width = Math.round(width * (MAX_SIZE / height));
+                        height = MAX_SIZE;
+                    }
+
+                    const canvas = document.createElement("canvas");
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) {
+                        // fallback: submit diretto
+                        form.submit();
+                        return;
+                    }
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob(
+                        (blob) => {
+                            // ⚠️ toBlob può tornare null -> fallback submit diretto
+                            if (!blob) {
+                                console.warn("toBlob returned null -> submit without compression");
+                                form.submit();
+                                return;
+                            }
+
+                            const compressedFile = new File([blob], "foto.jpg", { type: "image/jpeg" });
+
+                            const dt = new DataTransfer();
+                            dt.items.add(compressedFile);
+                            fileInput.files = dt.files;
+
+                            console.log(
+                                "Original:",
+                                Math.round(originalFile.size / 1024),
+                                "KB → Compressed:",
+                                Math.round(blob.size / 1024),
+                                "KB"
+                            );
+
+                            form.submit(); // submit reale
+                        },
+                        "image/jpeg",
+                        0.8
+                    );
+                } catch (err) {
+                    console.error(err);
+                    // fallback: submit diretto (meglio inviare che restare bloccati)
+                    form.submit();
                 }
-
-                const canvas = document.createElement("canvas");
-                canvas.width = width;
-                canvas.height = height;
-
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob(
-                    blob => {
-                        const compressedFile = new File(
-                            [blob],
-                            "foto.jpg",
-                            { type: "image/jpeg" }
-                        );
-
-                        const dt = new DataTransfer();
-                        dt.items.add(compressedFile);
-                        fileInput.files = dt.files;
-
-                        const spinner = document.getElementById("loading-spinner");
-                        if (spinner) spinner.style.display = "block";
-
-                        console.log(
-                            "Original:",
-                            Math.round(originalFile.size / 1024),
-                            "KB → Compressed:",
-                            Math.round(blob.size / 1024),
-                            "KB"
-                        );
-
-                        form.submit(); // submit reale
-                    },
-                    "image/jpeg",
-                    0.8 // qualità
-                );
             };
+
             img.src = reader.result;
         };
 
@@ -839,6 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
 
 
 
