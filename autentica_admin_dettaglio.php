@@ -92,7 +92,7 @@ $style = stile_card($perc);
 <meta charset="utf-8">
 <title>Dettaglio Analisi #<?= htmlentities($analisi['id']) ?></title>
 <link rel="icon" type="image/png" href="images/autentica.png">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fastly.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
 body { background:#f4f6f9; }
@@ -180,9 +180,10 @@ body { background:#f4f6f9; }
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+
 
 
 
